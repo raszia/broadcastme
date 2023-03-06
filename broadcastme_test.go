@@ -1,7 +1,7 @@
 package broadcastme_test
 
 import (
-	broadcastme "chanboradcast"
+	"broadcastme"
 	"context"
 	"sync"
 	"testing"

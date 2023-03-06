@@ -1,4 +1,4 @@
-module chanboradcast
+module broadcastme
 
 go 1.18
 
