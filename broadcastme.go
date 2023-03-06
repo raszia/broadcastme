@@ -44,10 +44,13 @@ func newChannel[T any, k comparable](key k) *channel[T, k] {
 	}
 }
 
+// Listen listen to a broadcast message with this method and get the messages.
 func (ch *channel[T, k]) Listen() <-chan T {
 	return ch.channel
 }
 
+// NewBroadcast creates a new broadcast message.
+// You can send your message later on the source channel for those who have subscribed to this key.
 func NewBroadcast[T any, k comparable](source <-chan T, key k) *broadcast[T, k] {
 	return &broadcast[T, k]{
 		source: source,
@@ -55,6 +58,7 @@ func NewBroadcast[T any, k comparable](source <-chan T, key k) *broadcast[T, k] 
 	}
 }
 
+// NewBroadcastServerWithContext creates a new BroadcastServer with the given context and broadcast.
 func NewBroadcastServerWithContext[T any, k comparable](ctx context.Context, b *broadcast[T, k]) BroadcastServer[T, k] {
 	service := &broadcastServer[T, k]{
 		muRw:      sync.RWMutex{},
@@ -63,17 +67,26 @@ func NewBroadcastServerWithContext[T any, k comparable](ctx context.Context, b *
 	go service.serve(ctx, b)
 	return service
 }
+
+// NewBroadcastServer creates a new BroadcastServer with the given broadcast.
+// It is recommended to use NewBroadcastServerWithContext to create a BroadcastServer with a context.
 func NewBroadcastServer[T any, k comparable](ctx context.Context, b *broadcast[T, k]) BroadcastServer[T, k] {
 	return NewBroadcastServerWithContext(context.Background(), b)
 }
 
+// AddNewBroadcastWithContext add new broadcast to existing server with the given context and broadcast.
 func (s *broadcastServer[T, k]) AddNewBroadcastWithContext(ctx context.Context, b *broadcast[T, k]) {
 	go s.serve(ctx, b)
 }
 
+// AddNewBroadcastWithContext add new broadcast to existing server with broadcast.
+// It is recommended to use
+// AddNewBroadcastWithContext()
 func (s *broadcastServer[T, k]) AddNewBroadcast(b *broadcast[T, k]) {
 	s.AddNewBroadcastWithContext(context.Background(), b)
 }
+
+// Subscribe use this method to subscibe to a broadcast and get the channel
 func (s *broadcastServer[T, k]) Subscribe(key k) *channel[T, k] {
 	s.muRw.Lock()
 	defer s.muRw.Unlock()
@@ -94,20 +107,21 @@ func (s *broadcastServer[T, k]) Subscribe(key k) *channel[T, k] {
 
 }
 
-// AddChannel adds a new channel to the listener
+// AddChannel adds a new channel to the listener.
 func (l *listener[T, k]) addChannel(ch *channel[T, k]) {
 	l.muRw.Lock()
 	defer l.muRw.Unlock()
 	l.channel[ch.uuid] = ch
 }
 
-// RemoveChannel removes a channel from the listener
+// RemoveChannel removes a channel from the listener.
 func (l *listener[T, k]) removeChannel(channelID uuid.UUID) {
 	l.muRw.Lock()
 	defer l.muRw.Unlock()
 	delete(l.channel, channelID)
 }
 
+// Unsubscribe unsubscribe a channel.
 func (s *broadcastServer[T, k]) Unsubscribe(channel *channel[T, k]) {
 	s.muRw.RLock()
 	defer s.muRw.RUnlock()
