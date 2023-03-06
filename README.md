@@ -1,6 +1,6 @@
 # broadcastme
 
- [![Go Report Card](https://goreportcard.com/badge/github.com/raszia/broadcastme)](https://goreportcard.com/report/github.com/raszia/broadcastme) [![CodeCov](https://codecov.io/gh/raszia/broadcastme/branch/master/graph/badge.svg)](https://codecov.io/gh/raszia/broadcastme) [![GoDoc](https://godoc.org/github.com/raszia/broadcastme?status.svg)](https://godoc.org/github.com/raszia/broadcastme) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/raszia/broadcastme/blob/master/LICENSE) ![build status](https://github.com/raszia/broadcastme/actions/workflows/go.yml/badge.svg)
+ [![Go Report Card](https://goreportcard.com/badge/github.com/raszia/broadcastme)](https://goreportcard.com/report/github.com/raszia/broadcastme) [![CodeCov](https://codecov.io/gh/raszia/broadcastme/branch/main/graph/badge.svg?token=MBOPVcQvT4)](https://codecov.io/gh/raszia/broadcastme) [![GoDoc](https://godoc.org/github.com/raszia/broadcastme?status.svg)](https://godoc.org/github.com/raszia/broadcastme) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/raszia/broadcastme/blob/master/LICENSE) ![build status](https://github.com/raszia/broadcastme/actions/workflows/go.yml/badge.svg)
 
 broadcastme is a Go package that provides a simple way to broadcast messages to multiple Go routines that are waiting to receive them.
 
