@@ -2,12 +2,17 @@
 
 broadcastme is a Go package that provides a simple way to broadcast messages to multiple Go routines that are waiting to receive them.
 
+The use of Go Generics in this package allows for the creation of a type-safe broadcast server that can handle any type of data, and provides flexibility to the client code. The package can be imported and used by other Go programs to easily implement a channel broadcasting feature in their applications.
+
 ## Features
 
-- Subscribe to a broadcast using a key.
-- Unsubscribe from a broadcast.
-- Add new broadcasts on the fly.
-- Supports Go's context.Context for graceful shutdown.
++ Subscribe to a broadcast using a key.
+
++ Unsubscribe from a broadcast.
+
++ Add new broadcasts on the fly.
+
++ Supports Go's context.Context for graceful shutdown.
 
 ## Installation
 
@@ -70,6 +75,8 @@ Add a new broadcast on the fly by calling `AddNewBroadcast()` on the server with
 ch2 := make(chan string)
 server.AddNewBroadcast(broadcastme.NewBroadcast(ch2, "newkey"))
 ```
+
+[examples](https://github.com/raszia/broadcastme/tree/main/example).
 
 ## License
 
