@@ -154,7 +154,7 @@ func (s *broadcastServer[T, k]) serve(ctx context.Context, b *broadcast[T, k]) {
 			}
 			s.muRw.RLock()
 			listner, ok := s.listeners[b.key]
-			if !ok { //no Subscribtion yet
+			if !ok { //no Subscription yet
 				s.muRw.RUnlock()
 				continue
 			}

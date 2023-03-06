@@ -27,7 +27,7 @@ func TestBroadcastServer(t *testing.T) {
 		name := "listener1"
 		t.Logf("%s wait for recive...", name)
 		msg1 := <-listener1.Listen()
-		t.Logf("%s recived %v", name, msg1)
+		t.Logf("%s received %v", name, msg1)
 		if msg1 != broadCastVal1 {
 			t.Errorf("%s expected %v got %v", name, broadCastVal1, msg1)
 		}
@@ -39,7 +39,7 @@ func TestBroadcastServer(t *testing.T) {
 		listener2 := broadcastServer.Subscribe(broadCastKeyTest)
 		t.Logf("%s wait for recive...", name)
 		msg2 := <-listener2.Listen()
-		t.Logf("%s recived %v", name, msg2)
+		t.Logf("%s received %v", name, msg2)
 		if msg2 != broadCastVal1 {
 			t.Errorf("%s expected %v got %v", name, broadCastVal1, msg2)
 		}
