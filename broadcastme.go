@@ -1,0 +1,164 @@
+package broadcastme
+
+import (
+	"context"
+	"sync"
+
+	"github.com/google/uuid"
+)
+
+type BroadcastServer[T any, k comparable] interface {
+	Subscribe(k) *channel[T, k]
+	Unsubscribe(*channel[T, k])
+	AddNewBroadcastWithContext(context.Context, *broadcast[T, k])
+	AddNewBroadcast(*broadcast[T, k])
+}
+
+type broadcast[T any, k comparable] struct {
+	source <-chan T
+	key    k
+}
+
+type broadcastServer[T any, k comparable] struct {
+	muRw      sync.RWMutex
+	listeners map[k]*listener[T, k]
+}
+
+type listener[T any, k comparable] struct {
+	muRw    sync.RWMutex
+	key     k
+	channel map[uuid.UUID]*channel[T, k]
+}
+
+type channel[T any, k comparable] struct {
+	key     k
+	channel chan T
+	uuid    uuid.UUID
+}
+
+func newChannel[T any, k comparable](key k) *channel[T, k] {
+	return &channel[T, k]{
+		key:     key,
+		channel: make(chan T),
+		uuid:    uuid.New(),
+	}
+}
+
+func (ch *channel[T, k]) Listen() <-chan T {
+	return ch.channel
+}
+
+func NewBroadcast[T any, k comparable](source <-chan T, key k) *broadcast[T, k] {
+	return &broadcast[T, k]{
+		source: source,
+		key:    key,
+	}
+}
+
+func NewBroadcastServerWithContext[T any, k comparable](ctx context.Context, b *broadcast[T, k]) BroadcastServer[T, k] {
+	service := &broadcastServer[T, k]{
+		muRw:      sync.RWMutex{},
+		listeners: make(map[k]*listener[T, k]),
+	}
+	go service.serve(ctx, b)
+	return service
+}
+func NewBroadcastServer[T any, k comparable](ctx context.Context, b *broadcast[T, k]) BroadcastServer[T, k] {
+	return NewBroadcastServerWithContext(context.Background(), b)
+}
+
+func (s *broadcastServer[T, k]) AddNewBroadcastWithContext(ctx context.Context, b *broadcast[T, k]) {
+	go s.serve(ctx, b)
+}
+
+func (s *broadcastServer[T, k]) AddNewBroadcast(b *broadcast[T, k]) {
+	s.AddNewBroadcastWithContext(context.Background(), b)
+}
+func (s *broadcastServer[T, k]) Subscribe(key k) *channel[T, k] {
+	s.muRw.Lock()
+	defer s.muRw.Unlock()
+
+	newChan := newChannel[T](key)
+	l, ok := s.listeners[key]
+	if !ok {
+		l = &listener[T, k]{
+			muRw:    sync.RWMutex{},
+			key:     key,
+			channel: make(map[uuid.UUID]*channel[T, k]),
+		}
+
+	}
+	s.listeners[key] = l
+	l.addChannel(newChan)
+	return newChan
+
+}
+
+// AddChannel adds a new channel to the listener
+func (l *listener[T, k]) addChannel(ch *channel[T, k]) {
+	l.muRw.Lock()
+	defer l.muRw.Unlock()
+	l.channel[ch.uuid] = ch
+}
+
+// RemoveChannel removes a channel from the listener
+func (l *listener[T, k]) removeChannel(channelID uuid.UUID) {
+	l.muRw.Lock()
+	defer l.muRw.Unlock()
+	delete(l.channel, channelID)
+}
+
+func (s *broadcastServer[T, k]) Unsubscribe(channel *channel[T, k]) {
+	s.muRw.RLock()
+	defer s.muRw.RUnlock()
+	s.listeners[channel.key].removeChannel(channel.uuid)
+	close(channel.channel)
+}
+
+func (s *broadcastServer[T, k]) serve(ctx context.Context, b *broadcast[T, k]) {
+	defer func() {
+
+		listner, ok := s.listeners[b.key]
+		if !ok { //no Subscrib yet
+			return
+		}
+		for _, channel := range listner.channel {
+			s.Unsubscribe(channel)
+		}
+		s.muRw.Lock()
+		defer s.muRw.Unlock()
+		delete(s.listeners, b.key)
+	}()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case val, ok := <-b.source:
+			if !ok {
+				return
+			}
+			s.muRw.RLock()
+			listner, ok := s.listeners[b.key]
+			if !ok { //no Subscribtion yet
+				s.muRw.RUnlock()
+				continue
+			}
+			s.muRw.RUnlock()
+			listner.muRw.RLock()
+			for _, ch := range listner.channel {
+				select {
+				case ch.channel <- val:
+				case <-ctx.Done():
+					listner.muRw.RUnlock()
+					return
+				default:
+					continue
+				}
+
+			}
+			listner.muRw.RUnlock()
+		}
+
+	}
+}
