@@ -25,7 +25,7 @@ func main() {
 	go func() {
 		defer wg.Done()
 		log.Println("listener1 is waiting...")
-		listener1 := server.Subscribe(broadcastKey)
+		listener1 := server.Subscribe(broadcastKey, 100)
 		msg1 := <-listener1.Listen()
 		log.Println("listener1 got:", msg1)
 	}()
@@ -33,7 +33,7 @@ func main() {
 	go func() {
 		defer wg.Done()
 		log.Println("listener2 is waiting...")
-		listener2 := server.Subscribe(broadcastKey)
+		listener2 := server.Subscribe(broadcastKey, 100)
 		msg2 := <-listener2.Listen()
 		log.Println("listener2 got:", msg2)
 	}()
