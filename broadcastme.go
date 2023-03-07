@@ -8,7 +8,7 @@ import (
 )
 
 type BroadcastServer[T any, k comparable] interface {
-	Subscribe(k) *channel[T, k]
+	Subscribe(k, uint) *channel[T, k]
 	Unsubscribe(*channel[T, k])
 	AddNewBroadcastWithContext(context.Context, *broadcast[T, k])
 	AddNewBroadcast(*broadcast[T, k])
@@ -31,16 +31,18 @@ type listener[T any, k comparable] struct {
 }
 
 type channel[T any, k comparable] struct {
-	key     k
-	channel chan T
-	uuid    uuid.UUID
+	key        k
+	channel    chan T
+	bufferSize uint
+	uuid       uuid.UUID
 }
 
-func newChannel[T any, k comparable](key k) *channel[T, k] {
+func newChannel[T any, k comparable](key k, bufferSize uint) *channel[T, k] {
 	return &channel[T, k]{
-		key:     key,
-		channel: make(chan T),
-		uuid:    uuid.New(),
+		key:        key,
+		bufferSize: bufferSize,
+		channel:    make(chan T, bufferSize),
+		uuid:       uuid.New(),
 	}
 }
 
@@ -87,11 +89,11 @@ func (s *broadcastServer[T, k]) AddNewBroadcast(b *broadcast[T, k]) {
 }
 
 // Subscribe use this method to subscibe to a broadcast and get the channel
-func (s *broadcastServer[T, k]) Subscribe(key k) *channel[T, k] {
+func (s *broadcastServer[T, k]) Subscribe(key k, bufferSize uint) *channel[T, k] {
 	s.muRw.Lock()
 	defer s.muRw.Unlock()
 
-	newChan := newChannel[T](key)
+	newChan := newChannel[T](key, bufferSize)
 	l, ok := s.listeners[key]
 	if !ok {
 		l = &listener[T, k]{
@@ -121,11 +123,42 @@ func (l *listener[T, k]) removeChannel(channelID uuid.UUID) {
 	delete(l.channel, channelID)
 }
 
-// Unsubscribe unsubscribe a channel.
-func (s *broadcastServer[T, k]) Unsubscribe(channel *channel[T, k]) {
+func (l *listener[T, k]) getAllChannels() []*channel[T, k] {
+	l.muRw.RLock()
+	defer l.muRw.RUnlock()
+	var chans []*channel[T, k]
+	for _, c := range l.channel {
+		chans = append(chans, c)
+	}
+	return chans
+}
+
+func (s *broadcastServer[T, k]) getlistener(key k) (*listener[T, k], bool) {
 	s.muRw.RLock()
 	defer s.muRw.RUnlock()
-	s.listeners[channel.key].removeChannel(channel.uuid)
+	l, ok := s.listeners[key]
+	return l, ok
+}
+
+func (s *broadcastServer[T, k]) removelistener(key k) bool {
+
+	_, ok := s.getlistener(key)
+	s.muRw.Lock()
+	defer s.muRw.Unlock()
+	if ok {
+		delete(s.listeners, key)
+	}
+	return ok
+}
+
+// Unsubscribe unsubscribe a channel.
+func (s *broadcastServer[T, k]) Unsubscribe(channel *channel[T, k]) {
+
+	l, ok := s.getlistener(channel.key)
+	if !ok {
+		return
+	}
+	l.removeChannel(channel.uuid)
 	close(channel.channel)
 }
 
@@ -139,9 +172,7 @@ func (s *broadcastServer[T, k]) serve(ctx context.Context, b *broadcast[T, k]) {
 		for _, channel := range listner.channel {
 			s.Unsubscribe(channel)
 		}
-		s.muRw.Lock()
-		defer s.muRw.Unlock()
-		delete(s.listeners, b.key)
+		s.removelistener(b.key)
 	}()
 
 	for {
@@ -152,26 +183,20 @@ func (s *broadcastServer[T, k]) serve(ctx context.Context, b *broadcast[T, k]) {
 			if !ok {
 				return
 			}
-			s.muRw.RLock()
-			listner, ok := s.listeners[b.key]
+			listner, ok := s.getlistener(b.key)
 			if !ok { //no Subscription yet
-				s.muRw.RUnlock()
 				continue
 			}
-			s.muRw.RUnlock()
-			listner.muRw.RLock()
-			for _, ch := range listner.channel {
-				select {
-				case ch.channel <- val:
-				case <-ctx.Done():
-					listner.muRw.RUnlock()
-					return
-				default:
-					continue
+			for _, ch := range listner.getAllChannels() {
+				if len(ch.channel) < int(ch.bufferSize) {
+					select {
+					case ch.channel <- val:
+					case <-ctx.Done():
+						return
+					}
 				}
-
 			}
-			listner.muRw.RUnlock()
+
 		}
 
 	}

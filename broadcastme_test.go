@@ -19,7 +19,7 @@ func TestBroadcastServer(t *testing.T) {
 
 	broadcastServer := broadcastme.NewBroadcastServerWithContext(ctx, broadCast)
 
-	listener1 := broadcastServer.Subscribe(broadCastKeyTest)
+	listener1 := broadcastServer.Subscribe(broadCastKeyTest, 100)
 	var wg sync.WaitGroup
 	wg.Add(3)
 	go func() {
@@ -36,7 +36,7 @@ func TestBroadcastServer(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		name := "listener2"
-		listener2 := broadcastServer.Subscribe(broadCastKeyTest)
+		listener2 := broadcastServer.Subscribe(broadCastKeyTest, 100)
 		t.Logf("%s wait for recive...", name)
 		msg2 := <-listener2.Listen()
 		t.Logf("%s received %v", name, msg2)
@@ -79,12 +79,15 @@ func TestBroadcastServer(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		name := "listener with cancled context"
-		listener2 := broadcastServer.Subscribe(broadCastKeyTest)
-		<-listener2.Listen()
-		msg2 := <-listener2.Listen()
-		if msg2 != "" {
-			t.Errorf("context is cancled %s should not get anyting but got %v", name, msg2)
+		listener2 := broadcastServer.Subscribe(broadCastKeyTest, 100)
+		tc := time.NewTicker(time.Second)
+		select {
+		case <-tc.C:
+			t.Errorf("%s is still listening but context is canceld", name)
+		case <-listener2.Listen():
 		}
+
+		t.Logf("%s stop listen becuse cantext has been canceled", name)
 	}()
 
 	cancel()
@@ -96,7 +99,7 @@ func TestBroadcastServer(t *testing.T) {
 
 	broadCast2 := broadcastme.NewBroadcast(ch2, broadCastKeyTest2)
 	broadcastServer.AddNewBroadcast(broadCast2)
-	listener := broadcastServer.Subscribe(broadCastKeyTest2)
+	listener := broadcastServer.Subscribe(broadCastKeyTest2, 100)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -105,6 +108,7 @@ func TestBroadcastServer(t *testing.T) {
 			t.Errorf("listener expected %v got %v", broadCastVal2, newMsg)
 		}
 	}()
+
 	ch2 <- broadCastVal2
 	wg.Wait()
 }
